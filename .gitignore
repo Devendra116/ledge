@@ -1,0 +1,38 @@
+# Bytecode and build
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+
+# Local env and secrets
+.env
+.venv/
+venv/
+env/
+
+# Caches and tooling
+*.mypy_cache/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.hypothesis/
+.cache/
+
+# Coverage and logs
+htmlcov/
+.coverage
+*.cover
+*.log
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store

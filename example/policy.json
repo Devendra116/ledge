@@ -1,0 +1,12 @@
+{
+    "simulate_before_sign": false,
+    "max_amount_usd_per_tx": 1.0,
+    "max_spend_usd_per_task": 5.0,
+    "allowed_networks": ["base_testnet", "base_mainnet"],
+    "blocked_addresses": [],
+    "require_reason": true,
+    "min_reason_length": 10,
+    "velocity_window_seconds": 30,
+    "velocity_max_tx": 5,
+    "escalate_risk_threshold": 0.65
+}

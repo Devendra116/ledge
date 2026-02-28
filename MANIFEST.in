@@ -1,0 +1,5 @@
+include README.md
+include docs/EXECUTORS.md
+include docs/SIGNING.md
+include example/policy.json
+include example/.env.example

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ledge-sdk"
+version = "0.1.0"
+description = "Policy-enforced payment execution for AI agents. Validates, signs, and audits every transaction before it moves."
+readme = "README.md"
+authors = [
+    { name = "Devendra Chauhan", email = "chauhandevendra116@gmail.com" }
+]
+requires-python = ">=3.10"
+keywords = ["ai", "agents", "web3", "payments", "x402", "base", "ethereum"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "eth-account>=0.10.0",
+    "web3>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "x402>=2.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ledge"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-asyncio", "mypy", "ruff", "respx", "pre-commit"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"example/*.py" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+disable_error_code = ["empty-body"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
