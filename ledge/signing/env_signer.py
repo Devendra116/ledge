@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
 
 from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
-from eth_account.signers.local import LocalAccount  # noqa: F401
 
 from ledge.errors import SigningFailed
+from ledge.signing._secure_account import _SecureAccountWrapper
 from ledge.signing.base import SigningProvider
 
 
@@ -48,9 +47,10 @@ class EnvSigner(SigningProvider):
                     f"'{env_var}' not set. Copy .env.example to .env and set your key."
                 )
             try:
-                self._account: Any = Account.from_key(raw_key)
+                account = Account.from_key(raw_key)
+                self._account = _SecureAccountWrapper(account)
             except Exception as e:
-                raise ValueError(f"Invalid private key in '{env_var}': {e}") from e
+                raise ValueError(f"Invalid private key in '{env_var}'") from e
         finally:
             # CRITICAL: always remove from env, even if from_key() raised
             os.environ.pop(env_var, None)
@@ -66,7 +66,7 @@ class EnvSigner(SigningProvider):
             raw = signed.raw_transaction.hex()
             return raw if raw.startswith("0x") else f"0x{raw}"
         except Exception as e:
-            raise SigningFailed(f"Transaction signing failed: {e}") from e
+            raise SigningFailed("Transaction signing failed") from e
 
     def sign_typed_data(
         self,
@@ -100,7 +100,7 @@ class EnvSigner(SigningProvider):
             raw = signed.signature.hex()
             return raw if raw.startswith("0x") else f"0x{raw}"
         except Exception as e:
-            raise SigningFailed(f"EIP-712 signing failed: {e}") from e
+            raise SigningFailed("EIP-712 signing failed") from e
 
     @property
     def address(self) -> str:

@@ -80,9 +80,11 @@ All logged to audit trail.
 | Use | Provider |
 |-----|----------|
 | Production | Turnkey, AWS KMS (coming) |
-| No .env, no KMS | Encrypted key file (planned) |
+| No .env, no KMS | **EncryptedFileSigner** (Ethereum keystore JSON + passphrase; import only) |
 | Quick test | EnvSigner (`.env`) |
 | Tests | MockSigner |
+
+**Agent isolation:** Expose only the `Wallet` to the agent (e.g. `wallet.pay`, `task.pay`). Do not pass the signer or raw key to the agent. The SDK wraps the key so that even if the signer object is accessed, `.key` and `.private_key` are not available. Using the key from `.env` is for **local testing only**; see [docs/SIGNING.md](docs/SIGNING.md).
 
 [docs/SIGNING.md](docs/SIGNING.md)
 

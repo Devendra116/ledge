@@ -13,6 +13,7 @@ from ledge.execution.transfer import TransferExecutor
 from ledge.execution.x402 import X402Executor
 from ledge.models import Network, Policy, Transaction, X402Params, load_policy
 from ledge.signing.base import SigningProvider
+from ledge.signing.encrypted_file_signer import EncryptedFileSigner
 from ledge.signing.env_signer import EnvSigner
 from ledge.signing.mock_signer import MockSigner
 from ledge.wallet import DIRECT_PAY_TASK_PREFIX, PayResult, Wallet
@@ -27,6 +28,7 @@ __all__ = [
     "Transaction",
     "X402Params",
     "Network",
+    "EncryptedFileSigner",
     "EnvSigner",
     "MockSigner",
     "SigningProvider",

@@ -13,6 +13,16 @@ class SigningProvider(ABC):
     Only the executor calls it, after the engine has approved.
     """
 
+    def __reduce_ex__(self, protocol: int) -> object:
+        """Prevent pickling; signers must not be serialized with key material."""
+        raise TypeError("SigningProvider instances cannot be pickled")
+
+    def __copy__(self) -> object:
+        raise TypeError("SigningProvider instances cannot be copied")
+
+    def __deepcopy__(self, memo: object) -> object:
+        raise TypeError("SigningProvider instances cannot be copied")
+
     @abstractmethod
     def sign(self, tx: dict[str, Any]) -> str:
         """
