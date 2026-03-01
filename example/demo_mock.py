@@ -1,129 +1,106 @@
 """
-Ledge SDK — Mock Demo
+Ledge SDK — Mock demo: direct pay, group task, and failure cases (BLOCK / ESCALATE).
 
-Loop-based demo: simulates an agent making multiple paid API calls in sequence.
-Exercises policy (budget, velocity, coherence) and shows ALLOW / BLOCK / ESCALATE.
-
-Run from repo root (after: pip install -e .):
   python example/demo_mock.py
 """
-from dotenv import load_dotenv
-
 from ledge import (
     AuditLogger,
     TransactionBlocked,
     TransactionEscalated,
     Wallet,
     load_policy,
+    X402Params,
 )
 from ledge.execution.base import ExecutionResult, PaymentExecutor
-from ledge.models import X402Params
 from ledge.models.transaction import Transaction
 from ledge.signing.base import SigningProvider
 from ledge.signing.mock_signer import MockSigner
 
-load_dotenv()
+ADDR = "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4"
+URL = "https://api.example.com/data"
 
 
-class _MockX402Executor(PaymentExecutor):
-    """Fake executor for demo — returns a mock hash without network calls."""
-
+class _MockExecutor(PaymentExecutor):
     def execute(self, tx: Transaction, signer: SigningProvider) -> ExecutionResult:
         return ExecutionResult(
-            tx_hash=f"0xMOCK_SETTLEMENT_{tx.amount:.4f}",
+            tx_hash=f"0xmock_{tx.amount:.4f}",
             protocol="x402",
             network=tx.network,
             amount=tx.amount,
-            response_data={"data": "mock API response", "price": tx.amount},
+            response_data=None,
         )
 
 
-def section(title: str) -> None:
-    print(f"\n{'─' * 55}")
-    print(f"  {title}")
-    print("─" * 55)
+def run(wallet: Wallet) -> None:
+    wallet._executors["x402"] = _MockExecutor()
 
+    # --- 1. Direct payments ---
+    print("1. Direct payments")
+    print("   pay(0.01, ...) ", end="")
+    r = wallet.pay(amount=0.01, to=ADDR, context="Fetch price feed", params=X402Params(url=URL))
+    print(f"→ ALLOW  tx={r.tx_hash[:16]}...")
 
-# Real-world style: list of tasks, each with a budget and a list of payment attempts.
-# Policy is tested as we loop: budget decreases, velocity builds, block/escalate when triggered.
-SCENARIOS = [
-    {
-        "name": "Research DeFi protocols by TVL",
-        "budget": 0.05,
-        "pays": [
-            {"amount": 0.01, "to": "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4", "reason": "Fetch DeFi protocol market data from paid API", "url": "https://api.example.com/defi/protocols"},
-            {"amount": 0.01, "to": "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4", "reason": "Fetch DeFi protocol market data from paid API", "url": "https://api.example.com/defi/protocols"},
-            {"amount": 0.01, "to": "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4", "reason": "Fetch DeFi protocol market data from paid API", "url": "https://api.example.com/defi/protocols"},
-            {"amount": 0.03, "to": "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4", "reason": "Fetch DeFi protocol market data from paid API", "url": "https://api.example.com/defi/protocols"},  # exceeds remaining → BLOCK
-        ],
-    },
-    {
-        "name": "Quick lookup",
-        "budget": 0.005,
-        "pays": [
-            {"amount": 0.01, "to": "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4", "reason": "Expensive premium data purchase exceeding budget", "url": "https://api.example.com/premium"},  # over budget → BLOCK
-        ],
-    },
-    {
-        "name": "Automated data collection",
-        "budget": 1.0,
-        "pays": [
-            {"amount": 0.001, "to": f"0x{'a' * 38}{i:02d}", "reason": "Pay for premium", "url": "https://api.example.com/data"}
-            for i in range(10)  # velocity + low coherence → ESCALATE after a few
-        ],
-    },
-]
+    print("   pay(1.50, ...) ", end="")
+    try:
+        wallet.pay(amount=1.50, to=ADDR, context="Large one-off payment", params=X402Params(url=URL))
+    except TransactionBlocked as e:
+        print(f"→ BLOCK  [{e.check_name}] {e.reason[:45]}")
+
+    print("   pay(0.01, context='x') ", end="")
+    try:
+        wallet.pay(amount=0.01, to=ADDR, context="x", params=X402Params(url=URL))
+    except TransactionBlocked as e:
+        print(f"→ BLOCK  [{e.check_name}] {e.reason[:40]}")
+
+    # --- 2. Group task: ALLOW then BLOCK (budget) ---
+    print("\n2. Group task (budget 0.02)")
+    with wallet.task("DeFi research", budget=0.02) as task:
+        for i, amt in enumerate([0.01, 0.01, 0.01], 1):
+            try:
+                r = task.pay(amt, ADDR, "Fetch DeFi protocol data", params=X402Params(url=URL))
+                left = next(iter(wallet.balances().values()), 0)
+                print(f"   #{i} pay ${amt:.2f} → ALLOW  remaining ${left:.2f}")
+            except TransactionBlocked as e:
+                print(f"   #{i} pay ${amt:.2f} → BLOCK  [{e.check_name}]")
+                break
+
+    # --- 3. Group task: ESCALATE (velocity + coherence) ---
+    print("\n3. Group task (velocity / coherence → ESCALATE)")
+    with wallet.task("Research DeFi protocols", budget=0.10) as task:
+        for i in range(6):
+            try:
+                r = task.pay(
+                    0.005,
+                    ADDR,
+                    "Fetch DeFi protocol market data from paid API",
+                    params=X402Params(url=URL),
+                )
+                print(f"   #{i+1} → ALLOW  risk={r.risk_score:.2f}")
+            except TransactionEscalated as e:
+                print(f"   #{i+1} → ESCALATE  risk={e.risk_score:.2f}")
+                break
+            except TransactionBlocked as e:
+                print(f"   #{i+1} → BLOCK  [{e.check_name}]")
+                break
+
+    # --- Audit ---
+    print("\n4. Audit (last 6)")
+    for ev in wallet.get_audit_trail(6):
+        icon = {"allow": "✅", "block": "🚫", "escalate": "⚠️"}[ev.outcome]
+        print(f"   {icon} {ev.outcome:8} ${ev.amount:.4f}  {ev.decision_reason[:42]}")
 
 
 def main() -> None:
-    print("\n🏦 Ledge SDK — Transaction Validation Demo (loop)")
-    print("   Protocol: x402  |  Network: base_testnet (mock)")
-    print("   Policy: budget, velocity, coherence → ALLOW / BLOCK / ESCALATE")
-
+    print("Ledge mock demo — direct pay, group task, BLOCK, ESCALATE\n")
     policy = load_policy("example/policy.json")
     wallet = Wallet(
         policy=policy,
         signer=MockSigner(),
         network="base_testnet",
         audit_logger=AuditLogger("./demo_mock_audit.jsonl"),
-        agent_id="research-agent-01",
     )
-    wallet._executors["x402"] = _MockX402Executor()
-
-    for scenario in SCENARIOS:
-        section(f"Task: {scenario['name']} (budget ${scenario['budget']:.4f})")
-        with wallet.task(scenario["name"], budget=scenario["budget"]) as task:
-            for i, pay in enumerate(scenario["pays"]):
-                try:
-                    result = task.pay(
-                        amount=pay["amount"],
-                        to=pay["to"],
-                        context=pay["reason"],
-                        params=X402Params(url=pay["url"]),
-                    )
-                    remaining = next(iter(wallet.balances().values()), 0)
-                    print(f"  #{i+1}  ✅ ALLOW   ${pay['amount']:.4f}  →  remaining ${remaining:.4f}  risk={result.risk_score:.2f}")
-                except TransactionBlocked as e:
-                    print(f"  #{i+1}  🚫 BLOCK  ${pay['amount']:.4f}  |  check={e.check_name}  |  {e.reason[:50]}")
-                    break
-                except TransactionEscalated as e:
-                    print(f"  #{i+1}  ⚠️  ESCALATE  ${pay['amount']:.4f}  |  risk={e.risk_score:.2f}  |  {e.reason[:50]}")
-                    break
-                except Exception as e:
-                    print(f"  #{i+1}  ❌ {e}")
-                    break
-
-    section("Audit Trail (most recent first)")
-    for event in wallet.get_audit_trail(12):
-        icon = {"allow": "✅", "block": "🚫", "escalate": "⚠️ "}.get(event.outcome, "?")
-        print(
-            f"  {icon} [{event.outcome.upper():8s}] "
-            f"${event.amount:.4f} USDC | "
-            f"{event.decision_reason[:45]}"
-        )
-
-    print("\n📋 Audit log: ./demo_mock_audit.jsonl")
-    print("   View: head -1 demo_mock_audit.jsonl | python -m json.tool\n")
+    run(wallet)
+    print("\nAudit file: ./demo_mock_audit.jsonl")
 
 
 if __name__ == "__main__":
