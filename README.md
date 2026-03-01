@@ -54,7 +54,7 @@ with wallet.task("Research DeFi", budget=0.50) as task:
 ## How it works
 
 1. **Agent** calls `wallet.pay(...)` or `task.pay(...)`
-2. **Ledge** runs 4 layers: technical → policy → coherence → behavioral
+2. **Ledge** runs 4 layers: technical → policy → coherence → behavioral. Coherence (Layer 3) uses word overlap (v1); set `coherence_weight: 0` in policy to disable it. An embedding-based version is planned.
 3. **Outcome**: ALLOW (execute) / BLOCK (reject) / ESCALATE (log, notify)
 4. Only on ALLOW does the wallet sign and execute
 
