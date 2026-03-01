@@ -9,7 +9,7 @@ from ledge.errors import TransactionBlocked
 from ledge.execution.base import ExecutionResult
 from ledge.models import Policy
 from ledge.signing.mock_signer import MockSigner
-from ledge.wallet import Wallet
+from ledge.wallet import DIRECT_PAY_TASK_PREFIX, Wallet
 
 
 @pytest.fixture
@@ -53,6 +53,52 @@ def test_happy_path(wallet: Wallet) -> None:
         assert result.amount_usd == 0.01
     finally:
         executor.execute = original_execute
+
+
+def test_direct_pay(wallet: Wallet) -> None:
+    """Direct wallet.pay() without task context — uses unique task_id (direct-<uuid>)."""
+    mock_result = ExecutionResult(
+        tx_hash="0xdirect123",
+        protocol="x402",
+        network="base_testnet",
+        amount_usd=0.01,
+        response_data=None,
+    )
+    executor = wallet._executors["x402"]
+    original_execute = executor.execute
+    executor.execute = lambda tx, signer: mock_result
+    try:
+        result = wallet.pay(
+            description="One-off fetch",
+            budget=0.01,
+            amount_usd=0.01,
+            to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
+            reason="Direct payment test",
+            protocol="x402",
+            endpoint_url="https://example.com/paid",
+        )
+        assert result.success is True
+        assert result.tx_hash == "0xdirect123"
+        assert len(wallet._tasks) == 0  # Task cleaned up
+    finally:
+        executor.execute = original_execute
+
+
+def test_direct_pay_audit_uses_unique_task_id(tmp_path: Path) -> None:
+    """Direct payments get unique task_id per call (direct-<uuid>) for production tracing."""
+    logger = AuditLogger(str(tmp_path / "direct_audit.jsonl"))
+    w = Wallet(Policy(), MockSigner(), audit_logger=logger)
+    w._executors["x402"].execute = lambda tx, signer: ExecutionResult(
+        tx_hash="0x1", protocol="x402", network="base_testnet", amount_usd=0.01
+    )
+    addr = "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4"
+    w.pay("Fetch A", budget=0.01, amount_usd=0.01, to=addr, reason="Direct payment test A")
+    w.pay("Fetch B", budget=0.01, amount_usd=0.01, to=addr, reason="Direct payment test B")
+    events = logger.recent(10)
+    assert len(events) == 2
+    task_ids = [e.task_id for e in events]
+    assert len(set(task_ids)) == 2, "each direct pay must have unique task_id"
+    assert all(tid.startswith(DIRECT_PAY_TASK_PREFIX + "-") for tid in task_ids)
 
 
 def test_budget_exceeded_raises(wallet: Wallet) -> None:

@@ -15,10 +15,11 @@ from ledge.models import Network, Policy, Transaction, load_policy
 from ledge.signing.base import SigningProvider
 from ledge.signing.env_signer import EnvSigner
 from ledge.signing.mock_signer import MockSigner
-from ledge.wallet import PayResult, Wallet
+from ledge.wallet import DIRECT_PAY_TASK_PREFIX, PayResult, Wallet
 
 __version__ = "0.1.0"
 __all__ = [
+    "DIRECT_PAY_TASK_PREFIX",
     "Wallet",
     "PayResult",
     "Policy",

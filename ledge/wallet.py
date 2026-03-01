@@ -1,11 +1,17 @@
 """
 Wallet — the single public interface for all agent payment operations.
 
-The agent only ever calls:
-  with wallet.task(...) as task:
-      result = task.pay(amount_usd, to, reason)
+Two usage patterns:
 
-Everything else is handled internally.
+1. Task-scoped (multi-payment):
+   with wallet.task("Research DeFi", budget=2.0) as task:
+       result = task.pay(0.01, to="0x...", reason="Fetch data")
+       result = task.pay(0.02, to="0x...", reason="Another call")
+
+2. Direct (single payment):
+   result = wallet.pay("Fetch data", budget=0.01, amount_usd=0.01, to="0x...", reason="...")
+
+Direct payments get a unique task_id per call (e.g. direct-<uuid>) for production tracing.
 """
 
 from __future__ import annotations
@@ -23,6 +29,9 @@ from ledge.execution.x402 import X402Executor
 from ledge.models import HttpMethod, Network, Policy, TaskContext, Transaction
 from ledge.models.transaction import Protocol
 from ledge.signing.base import SigningProvider
+
+# Prefix for direct-payment task_ids. Filter audit with task_id.startswith(DIRECT_PAY_TASK_PREFIX).
+DIRECT_PAY_TASK_PREFIX = "direct"
 
 
 @dataclass
@@ -136,14 +145,12 @@ class Wallet:
     """
     Main entry point. One instance per agent session.
 
-    Usage:
-        wallet = Wallet(
-            policy=load_policy("policy.json"),
-            signer=EnvSigner(),
-            network="base_testnet",
-        )
+    Usage (task-scoped, multi-payment):
         with wallet.task("Research DeFi protocols", budget=2.0) as task:
             result = task.pay(0.01, to="0x...", reason="Fetch market data")
+
+    Usage (direct, single payment):
+        result = wallet.pay("Fetch data", budget=0.01, amount_usd=0.01, to="0x...", reason="...")
     """
 
     def __init__(
@@ -175,8 +182,53 @@ class Wallet:
         Create a scoped task with a budget. Use as context manager.
         Budget is allocated on enter, unused funds logged on exit.
         """
-        tid = task_id or str(uuid.uuid4())[:8]
+        tid = task_id or str(uuid.uuid4())
         return _TaskSession(self, tid, description, budget)
+
+    def pay(
+        self,
+        description: str,
+        budget: float,
+        amount_usd: float,
+        to: str,
+        reason: str,
+        protocol: Protocol = "x402",
+        endpoint_url: str | None = None,
+        endpoint_method: HttpMethod = "GET",
+        endpoint_json: dict[str, object] | None = None,
+    ) -> PayResult:
+        """
+        Direct single payment without task context. Convenience for one-off payments.
+
+        Each call gets a unique task_id (direct-<uuid>) for production tracing and audit.
+        Filter direct payments in audit with task_id.startswith(DIRECT_PAY_TASK_PREFIX).
+
+        Args:
+            description: Task description (used for policy/coherence checks)
+            budget: Budget for this single payment (typically >= amount_usd)
+            amount_usd: Amount in USD
+            to: Destination address
+            reason: Why this payment is being made
+            protocol, endpoint_url, endpoint_method, endpoint_json: Same as task.pay()
+
+        Returns: PayResult on success
+        Raises: Same as task.pay()
+        """
+        task_id = f"{DIRECT_PAY_TASK_PREFIX}-{uuid.uuid4().hex}"
+        self._start_task(task_id, description, budget)
+        try:
+            return self._pay(
+                task_id=task_id,
+                amount_usd=amount_usd,
+                to=to,
+                reason=reason,
+                protocol=protocol,
+                endpoint_url=endpoint_url,
+                endpoint_method=endpoint_method,
+                endpoint_json=endpoint_json,
+            )
+        finally:
+            self._end_task(task_id)
 
     def _start_task(self, task_id: str, description: str, budget: float) -> None:
         self._tasks[task_id] = _TaskBudget(task_id, description, budget)

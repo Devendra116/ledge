@@ -1,4 +1,6 @@
-# ledge-sdk
+<h2 align="center">Work in Progress !!</h2>
+
+# ledge-sdk 
 
 **Let your agent pay for x402 APIs within a per-task budget — with policy and audit, no per-call approval.**
 
@@ -25,9 +27,34 @@ wallet = Wallet(
     signer=EnvSigner(),          # reads AGENT_PRIVATE_KEY from .env (wiped after load — one Wallet per process)
     network="base_testnet",      # Base Sepolia — use "base_mainnet" for production
 )
+```
 
+### Simple: Direct single payment
+
+**Use when:** One-off payment, no need to group multiple calls under a shared budget. Each call gets a unique task_id for tracing.
+
+```python
+result = wallet.pay(
+    description="Fetch market data",
+    budget=0.01,
+    amount_usd=0.01,
+    to="0xPayToAddress...",
+    reason="One-time API call for price feed",
+    endpoint_url="https://api.example.com/prices",
+)
+print(f"Settled: {result.tx_hash}")
+```
+
+### Batch: Task-scoped multi-payment
+
+**Use when:** Multiple related payments that share one budget (e.g. fetching from several APIs in a single task). All payments in the block share the same task_id and budget.
+
+```python
 with wallet.task("Research DeFi protocols", budget=0.50) as task:
-    for url, amount in [("https://api.example.com/defi", 0.01), ("https://api.example.com/prices", 0.005)]:
+    for url, amount in [
+        ("https://api.example.com/defi", 0.01),
+        ("https://api.example.com/prices", 0.005),
+    ]:
         try:
             result = task.pay(
                 amount_usd=amount,
@@ -46,6 +73,8 @@ with wallet.task("Research DeFi protocols", budget=0.50) as task:
             print(f"Execution failed: {e}")
             break
 ```
+
+**Audit:** Direct payments use task_id prefix `direct-`; batch tasks get a UUID. Filter with `task_id.startswith(DIRECT_PAY_TASK_PREFIX)` for ad-hoc payments.
 
 ## How It Works
 
