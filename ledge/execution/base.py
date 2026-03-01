@@ -16,7 +16,7 @@ class ExecutionResult:
     tx_hash: str
     protocol: str
     network: str
-    amount_usd: float
+    amount: float
     response_data: dict[str, object] | None = None
 
 

@@ -4,20 +4,23 @@ The signing interface has two methods:
 - `sign(tx: dict) -> str` — for on-chain transactions (TransferExecutor)
 - `sign_typed_data(domain, types, message) -> str` — for EIP-712 (X402Executor)
 
+Ledge avoids requiring keys in `.env` for production. Use a production signer or encrypted key file; reserve `.env` for quick local testing.
+
 ## Available Now
 
-| Provider   | Use             | Key location                    |
-|-----------|-----------------|----------------------------------|
-| MockSigner| Tests and demos | No real key                     |
-| EnvSigner | Local development | .env file — wiped from env on load |
+| Provider   | Use                  | Key location                         |
+|-----------|----------------------|--------------------------------------|
+| MockSigner| Tests and demos      | No real key                          |
+| EnvSigner | Quick local testing  | .env file — wiped from env on load   |
 
 ## Coming Soon
 
-| Provider      | Use             | Key location                     |
-|--------------|-----------------|-----------------------------------|
-| TurnkeySigner| Production web3 | Turnkey TEE — key never leaves hardware |
-| AwsKmsSigner | Teams on AWS    | AWS KMS — ~$0.03 per 10k requests |
-| VaultSigner  | Enterprise      | HashiCorp Vault transit engine   |
+| Provider      | Use                    | Key location                              |
+|--------------|------------------------|-------------------------------------------|
+| TurnkeySigner| Production              | Turnkey TEE — key never leaves hardware   |
+| AwsKmsSigner | Production (AWS teams) | AWS KMS                                   |
+| Encrypted key file | No .env, no KMS   | Encrypted key in file; unlock with passphrase/env |
+| VaultSigner  | Enterprise              | HashiCorp Vault transit engine            |
 
 ## Adding Your Own
 

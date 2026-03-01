@@ -13,10 +13,10 @@ def _make_event(tmp_path: Path) -> tuple[AuditLogger, AuditEvent]:
     log_path = tmp_path / "test_audit.jsonl"
     logger = AuditLogger(str(log_path))
     tx = Transaction(
-        0.01,
-        "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
-        "Test payment reason here",
-        "t1",
+        amount=0.01,
+        to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
+        context="Test payment context here",
+        task_id="t1",
     )
     ctx = TaskContext("t1", "Test task", "agent-1", 10.0, 0.0)
     decision = evaluate(tx, ctx, Policy())
@@ -58,4 +58,5 @@ def test_event_is_valid_json(tmp_path: Path) -> None:
         data = json.loads(f.readline())
     assert "event_id" in data
     assert "outcome" in data
-    assert "amount_usd" in data
+    assert "amount" in data
+    assert "context_given" in data

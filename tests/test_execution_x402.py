@@ -16,9 +16,9 @@ def executor() -> X402Executor:
 @pytest.fixture
 def mock_tx() -> Transaction:
     return Transaction(
-        amount_usd=0.01,
+        amount=0.01,
         to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
-        reason="Fetch DeFi market data from paid API",
+        context="Fetch DeFi market data from paid API",
         task_id="t1",
         protocol="x402",
         network="base_testnet",
@@ -29,10 +29,10 @@ def mock_tx() -> Transaction:
 def test_transfer_executor_raises_not_implemented() -> None:
     executor = TransferExecutor()
     tx = Transaction(
-        0.01,
-        "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
-        "test",
-        "t1",
+        amount=0.01,
+        to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
+        context="test",
+        task_id="t1",
         protocol="transfer",
     )
     with pytest.raises(NotImplementedError):

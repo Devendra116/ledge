@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Literal
+
+ContextInput = str | dict[str, object]
+
+
+def context_to_string(context: ContextInput) -> str:
+    """Normalize context (agent context / current state) to string for policy and audit."""
+    if isinstance(context, str):
+        return context
+    return json.dumps(context, sort_keys=True)
 
 Protocol = Literal["x402", "transfer"]
 Network = Literal["base_testnet", "base_mainnet"]
@@ -28,9 +38,9 @@ _USDC_CONTRACTS: dict[str, str] = {
 
 @dataclass
 class Transaction:
-    amount_usd: float
+    amount: float
     to: str
-    reason: str
+    context: ContextInput  # agent context or current state (str or dict)
     task_id: str
     protocol: Protocol = "x402"
     network: Network = "base_testnet"
@@ -49,8 +59,10 @@ class Transaction:
         )
 
     @property
-    def amount_atomic(self) -> int:
-        return int(self.amount_usd * 1_000_000)
+    def context_string(self) -> str:
+        """String form of context for policy checks and audit."""
+        return context_to_string(self.context)
+
 
     @property
     def usdc_contract(self) -> str:

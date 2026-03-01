@@ -7,7 +7,7 @@ import pytest
 from ledge.audit import AuditLogger
 from ledge.errors import TransactionBlocked
 from ledge.execution.base import ExecutionResult
-from ledge.models import Policy
+from ledge.models import Policy, X402Params
 from ledge.signing.mock_signer import MockSigner
 from ledge.wallet import DIRECT_PAY_TASK_PREFIX, Wallet
 
@@ -29,7 +29,7 @@ def test_happy_path(wallet: Wallet) -> None:
         tx_hash="0xabc123",
         protocol="x402",
         network="base_testnet",
-        amount_usd=0.01,
+        amount=0.01,
         response_data={"data": "ok"},
     )
     executor = wallet._executors["x402"]
@@ -46,11 +46,11 @@ def test_happy_path(wallet: Wallet) -> None:
                 "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
                 "Fetch paid API data for testing",
                 protocol="x402",
-                endpoint_url="https://example.com/paid",
+                params=X402Params(url="https://example.com/paid"),
             )
         assert result.success is True
         assert result.tx_hash == "0xabc123"
-        assert result.amount_usd == 0.01
+        assert result.amount == 0.01
     finally:
         executor.execute = original_execute
 
@@ -61,7 +61,7 @@ def test_direct_pay(wallet: Wallet) -> None:
         tx_hash="0xdirect123",
         protocol="x402",
         network="base_testnet",
-        amount_usd=0.01,
+        amount=0.01,
         response_data=None,
     )
     executor = wallet._executors["x402"]
@@ -69,13 +69,11 @@ def test_direct_pay(wallet: Wallet) -> None:
     executor.execute = lambda tx, signer: mock_result
     try:
         result = wallet.pay(
-            description="One-off fetch",
-            budget=0.01,
-            amount_usd=0.01,
+            amount=0.01,
             to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
-            reason="Direct payment test",
+            context="Direct payment test",
             protocol="x402",
-            endpoint_url="https://example.com/paid",
+            params=X402Params(url="https://example.com/paid"),
         )
         assert result.success is True
         assert result.tx_hash == "0xdirect123"
@@ -89,11 +87,11 @@ def test_direct_pay_audit_uses_unique_task_id(tmp_path: Path) -> None:
     logger = AuditLogger(str(tmp_path / "direct_audit.jsonl"))
     w = Wallet(Policy(), MockSigner(), audit_logger=logger)
     w._executors["x402"].execute = lambda tx, signer: ExecutionResult(
-        tx_hash="0x1", protocol="x402", network="base_testnet", amount_usd=0.01
+        tx_hash="0x1", protocol="x402", network="base_testnet", amount=0.01
     )
     addr = "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4"
-    w.pay("Fetch A", budget=0.01, amount_usd=0.01, to=addr, reason="Direct payment test A")
-    w.pay("Fetch B", budget=0.01, amount_usd=0.01, to=addr, reason="Direct payment test B")
+    w.pay(amount=0.01, to=addr, context="Direct payment test A", params=X402Params(url="https://a.example.com"))
+    w.pay(amount=0.01, to=addr, context="Direct payment test B", params=X402Params(url="https://b.example.com"))
     events = logger.recent(10)
     assert len(events) == 2
     task_ids = [e.task_id for e in events]
@@ -108,6 +106,7 @@ def test_budget_exceeded_raises(wallet: Wallet) -> None:
                 1.0,
                 "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
                 "Exceeds budget test payment here",
+                params=X402Params(url="https://example.com/paid"),
             )
         assert "budget" in exc.value.check_name
 
@@ -121,6 +120,7 @@ def test_blocked_tx_writes_audit_log(tmp_path: Path) -> None:
                 1.0,
                 "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
                 "This exceeds budget",
+                params=X402Params(url="https://example.com/paid"),
             )
         except TransactionBlocked:
             pass
@@ -152,6 +152,7 @@ def test_audit_trail_returns_events(tmp_path: Path) -> None:
                 100.0,
                 "0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
                 "too much",
+                params=X402Params(url="https://example.com/paid"),
             )
         except TransactionBlocked:
             pass

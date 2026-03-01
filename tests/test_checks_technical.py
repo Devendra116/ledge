@@ -19,9 +19,9 @@ def test_valid_address_passes(tx: Transaction, ctx: TaskContext, policy: Policy)
 
 def test_invalid_address_blocked(ctx: TaskContext, policy: Policy) -> None:
     tx = Transaction(
-        amount_usd=0.01,
+        amount=0.01,
         to="not-an-address",
-        reason="Fetch data",
+        context="Fetch data",
         task_id=ctx.task_id,
         protocol="x402",
         network="base_testnet",
@@ -33,9 +33,9 @@ def test_invalid_address_blocked(ctx: TaskContext, policy: Policy) -> None:
 
 def test_empty_address_blocked(ctx: TaskContext, policy: Policy) -> None:
     tx = Transaction(
-        amount_usd=0.01,
+        amount=0.01,
         to="",
-        reason="Fetch data",
+        context="Fetch data",
         task_id=ctx.task_id,
         protocol="x402",
         network="base_testnet",

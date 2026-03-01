@@ -51,10 +51,10 @@ def test_disallowed_network(tx: Transaction, ctx: TaskContext, policy: Policy) -
 
 
 def test_short_reason_blocked(tx: Transaction, ctx: TaskContext, policy: Policy) -> None:
-    tx.reason = "short"
+    tx.context = "short"
     result = check_reason(tx, ctx, policy)
     assert result.outcome is Outcome.BLOCK
-    assert "Reason too short" in result.reason
+    assert "Context too short" in result.reason
 
 
 def test_valid_reason_passes(tx: Transaction, ctx: TaskContext, policy: Policy) -> None:

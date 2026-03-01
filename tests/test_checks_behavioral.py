@@ -31,7 +31,7 @@ def test_no_history_zero_anomaly(tx: Transaction, ctx: TaskContext, policy: Poli
 
 def test_outlier_amount_flagged(tx: Transaction, ctx: TaskContext, policy: Policy) -> None:
     ctx.historical_amounts_usd = [1.0, 1.0, 1.0, 1.0]
-    tx.amount_usd = 10.0
+    tx.amount = 10.0
     result = check_amount_anomaly(tx, ctx, policy)
     assert result.risk_contribution == policy.anomaly_weight
 

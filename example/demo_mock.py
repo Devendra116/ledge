@@ -17,6 +17,7 @@ from ledge import (
     load_policy,
 )
 from ledge.execution.base import ExecutionResult, PaymentExecutor
+from ledge.models import X402Params
 from ledge.models.transaction import Transaction
 from ledge.signing.base import SigningProvider
 from ledge.signing.mock_signer import MockSigner
@@ -29,11 +30,11 @@ class _MockX402Executor(PaymentExecutor):
 
     def execute(self, tx: Transaction, signer: SigningProvider) -> ExecutionResult:
         return ExecutionResult(
-            tx_hash=f"0xMOCK_SETTLEMENT_{tx.amount_usd:.4f}",
+            tx_hash=f"0xMOCK_SETTLEMENT_{tx.amount:.4f}",
             protocol="x402",
             network=tx.network,
-            amount_usd=tx.amount_usd,
-            response_data={"data": "mock API response", "price": tx.amount_usd},
+            amount=tx.amount,
+            response_data={"data": "mock API response", "price": tx.amount},
         )
 
 
@@ -95,10 +96,10 @@ def main() -> None:
             for i, pay in enumerate(scenario["pays"]):
                 try:
                     result = task.pay(
-                        amount_usd=pay["amount"],
+                        amount=pay["amount"],
                         to=pay["to"],
-                        reason=pay["reason"],
-                        endpoint_url=pay["url"],
+                        context=pay["reason"],
+                        params=X402Params(url=pay["url"]),
                     )
                     remaining = next(iter(wallet.balances().values()), 0)
                     print(f"  #{i+1}  ✅ ALLOW   ${pay['amount']:.4f}  →  remaining ${remaining:.4f}  risk={result.risk_score:.2f}")
@@ -117,7 +118,7 @@ def main() -> None:
         icon = {"allow": "✅", "block": "🚫", "escalate": "⚠️ "}.get(event.outcome, "?")
         print(
             f"  {icon} [{event.outcome.upper():8s}] "
-            f"${event.amount_usd:.4f} USDC | "
+            f"${event.amount:.4f} USDC | "
             f"{event.decision_reason[:45]}"
         )
 

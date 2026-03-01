@@ -223,7 +223,7 @@ class X402Executor(PaymentExecutor):
                 tx_hash=tx_hash,
                 protocol="x402",
                 network=self._network,
-                amount_usd=tx.amount_usd,
+                amount=tx.amount,
                 response_data=response_data,
             )
 

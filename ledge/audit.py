@@ -26,9 +26,9 @@ class AuditEvent:
     protocol: str  # "x402" | "transfer"
     network: str  # "base_testnet" | "base_mainnet"
     outcome: str  # "allow" | "block" | "escalate"
-    amount_usd: float
+    amount: float
     to: str
-    reason_given: str
+    context_given: str
     decision_reason: str
     risk_score: float
     tx_hash: str | None
@@ -84,9 +84,9 @@ def make_audit_event(
         protocol=tx.protocol,
         network=tx.network,
         outcome=decision.outcome.value,
-        amount_usd=tx.amount_usd,
+        amount=tx.amount,
         to=tx.to,
-        reason_given=tx.reason,
+        context_given=tx.context_string,
         decision_reason=decision.reason,
         risk_score=decision.risk_score,
         tx_hash=tx_hash,

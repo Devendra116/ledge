@@ -27,11 +27,11 @@ def check_amount_anomaly(tx: Transaction, ctx: TaskContext, policy: Policy) -> C
     if len(history) < 3:
         return CheckResult("amount_anomaly", Outcome.ALLOW, "Insufficient history", 0.0)
     avg = sum(history) / len(history)
-    if tx.amount_usd > avg * policy.anomaly_multiplier_threshold:
+    if tx.amount > avg * policy.anomaly_multiplier_threshold:
         return CheckResult(
             "amount_anomaly",
             Outcome.ALLOW,
-            f"${tx.amount_usd:.4f} is {tx.amount_usd / avg:.1f}x avg (${avg:.4f})",
+            f"${tx.amount:.4f} is {tx.amount / avg:.1f}x avg (${avg:.4f})",
             round(policy.anomaly_weight, 4),
         )
     return CheckResult(

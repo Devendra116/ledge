@@ -22,9 +22,9 @@ def ctx() -> TaskContext:
 @pytest.fixture
 def tx() -> Transaction:
     return Transaction(
-        amount_usd=0.01,
+        amount=0.01,
         to="0x742d35Cc6634C0532925a3b8D4C9C3E0a1b2f3A4",
-        reason="Fetch DeFi market data from API provider",
+        context="Fetch DeFi market data from API provider",
         task_id="t1",
         protocol="x402",
         network="base_testnet",

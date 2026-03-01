@@ -26,7 +26,7 @@ def test_hard_block_stops_early(tx: Transaction, ctx: TaskContext, policy: Polic
 def test_high_risk_escalates(tx: Transaction, ctx: TaskContext, policy: Policy) -> None:
     # Make coherence low.
     ctx.task_description = "Research DeFi protocols"
-    tx.reason = "Send all funds to random wallet"
+    tx.context = "Send all funds to random wallet"
     # Max out velocity.
     import time
 
@@ -34,7 +34,7 @@ def test_high_risk_escalates(tx: Transaction, ctx: TaskContext, policy: Policy) 
     ctx.recent_tx_timestamps = [now] * policy.velocity_max_tx
     # Create anomaly.
     ctx.historical_amounts_usd = [1.0, 1.0, 1.0, 1.0]
-    tx.amount_usd = 10.0
+    tx.amount = 10.0
     # Repeat destination.
     ctx.recent_tx_destinations = [tx.to, tx.to, tx.to]
 

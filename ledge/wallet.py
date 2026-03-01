@@ -3,15 +3,14 @@ Wallet — the single public interface for all agent payment operations.
 
 Two usage patterns:
 
-1. Task-scoped (multi-payment):
+1. Task-scoped (multi-payment): pass budget when opening the task.
    with wallet.task("Research DeFi", budget=2.0) as task:
-       result = task.pay(0.01, to="0x...", reason="Fetch data")
-       result = task.pay(0.02, to="0x...", reason="Another call")
+       result = task.pay(0.01, to="0x...", context="Fetch data", params=X402Params(url="..."))
 
-2. Direct (single payment):
-   result = wallet.pay("Fetch data", budget=0.01, amount_usd=0.01, to="0x...", reason="...")
+2. Direct (single payment): optional budget (default from policy).
+   result = wallet.pay(amount=0.01, to="0x...", context="...", params=X402Params(url="..."))
 
-Direct payments get a unique task_id per call (e.g. direct-<uuid>) for production tracing.
+Executor-specific details go in params (e.g. X402Params); protocol stays at top level.
 """
 
 from __future__ import annotations
@@ -26,23 +25,33 @@ from ledge.engine.result import Outcome
 from ledge.errors import ExecutionFailed, TransactionBlocked, TransactionEscalated
 from ledge.execution.base import ExecutionResult, PaymentExecutor
 from ledge.execution.x402 import X402Executor
-from ledge.models import HttpMethod, Network, Policy, TaskContext, Transaction
-from ledge.models.transaction import Protocol
+from ledge.models import Network, Policy, TaskContext, Transaction, X402Params
+from ledge.models.params import PaymentParams
+from ledge.models.transaction import ContextInput, HttpMethod, Protocol
 from ledge.signing.base import SigningProvider
 
 # Prefix for direct-payment task_ids. Filter audit with task_id.startswith(DIRECT_PAY_TASK_PREFIX).
 DIRECT_PAY_TASK_PREFIX = "direct"
 
 
+def _params_to_endpoint(
+    params: PaymentParams | None, protocol: Protocol
+) -> tuple[str | None, HttpMethod, dict[str, object] | None]:
+    """Unpack executor params into endpoint_url, endpoint_method, endpoint_json for Transaction."""
+    if protocol == "x402" and isinstance(params, X402Params):
+        return (params.url, params.method, params.body)
+    return (None, "GET", None)
+
+
 @dataclass
 class PayResult:
-    """Returned by task.pay() on success."""
+    """Returned by task.pay() / wallet.pay() on success."""
 
     success: bool
     tx_hash: str
-    amount_usd: float
+    amount: float
     to: str
-    reason: str
+    context: str  # string form of context given at pay time
     protocol: str
     network: str
     risk_score: float
@@ -104,40 +113,32 @@ class _TaskSession:
 
     def pay(
         self,
-        amount_usd: float,
+        amount: float,
         to: str,
-        reason: str,
+        context: ContextInput,
         protocol: Protocol = "x402",
-        endpoint_url: str | None = None,
-        endpoint_method: HttpMethod = "GET",
-        endpoint_json: dict[str, object] | None = None,
+        params: PaymentParams | None = None,
     ) -> PayResult:
         """
         Make a payment. Runs full decision engine before any money moves.
 
         Args:
-            amount_usd:   Amount in USD (e.g. 0.01 = one cent)
-            to:           Destination address (payTo wallet address)
-            reason:       Why this payment is being made — required for audit
-            protocol:     "x402" (default) or "transfer"
-            endpoint_url: For x402: the URL being fetched (may differ from `to`)
-            endpoint_method: "GET" or "POST" for x402 requests (default "GET")
-            endpoint_json: For x402 POST: JSON body (Content-Type: application/json)
+            amount:   Amount to pay
+            to:       Destination address (payTo wallet address)
+            context:  Agent context or current state (str or dict) — for audit and coherence
+            protocol: "x402" (default) or "transfer"
+            params:   Executor-specific params (e.g. X402Params(url=...) for x402)
 
         Returns: PayResult on success
-        Raises: TransactionBlocked if a hard policy check fails
-        Raises: TransactionEscalated if risk score exceeds threshold
-        Raises: ExecutionFailed if execution fails after approval
+        Raises: TransactionBlocked, TransactionEscalated, ExecutionFailed
         """
         return self._wallet._pay(
             task_id=self._task_id,
-            amount_usd=amount_usd,
+            amount=amount,
             to=to,
-            reason=reason,
+            context=context,
             protocol=protocol,
-            endpoint_url=endpoint_url,
-            endpoint_method=endpoint_method,
-            endpoint_json=endpoint_json,
+            params=params,
         )
 
 
@@ -147,10 +148,10 @@ class Wallet:
 
     Usage (task-scoped, multi-payment):
         with wallet.task("Research DeFi protocols", budget=2.0) as task:
-            result = task.pay(0.01, to="0x...", reason="Fetch market data")
+            result = task.pay(0.01, to="0x...", context="Fetch market data", params=X402Params(url="..."))
 
     Usage (direct, single payment):
-        result = wallet.pay("Fetch data", budget=0.01, amount_usd=0.01, to="0x...", reason="...")
+        result = wallet.pay(amount=0.01, to="0x...", context="...", params=X402Params(url="..."))
     """
 
     def __init__(
@@ -187,45 +188,43 @@ class Wallet:
 
     def pay(
         self,
-        description: str,
-        budget: float,
-        amount_usd: float,
+        amount: float,
         to: str,
-        reason: str,
+        context: ContextInput,
         protocol: Protocol = "x402",
-        endpoint_url: str | None = None,
-        endpoint_method: HttpMethod = "GET",
-        endpoint_json: dict[str, object] | None = None,
+        params: PaymentParams | None = None,
+        budget: float | None = None,
+        description: str | None = None,
     ) -> PayResult:
         """
         Direct single payment without task context. Convenience for one-off payments.
 
         Each call gets a unique task_id (direct-<uuid>) for production tracing and audit.
-        Filter direct payments in audit with task_id.startswith(DIRECT_PAY_TASK_PREFIX).
+        Budget is optional; when omitted, uses policy max_amount_usd_per_tx for this single payment.
 
         Args:
-            description: Task description (used for policy/coherence checks)
-            budget: Budget for this single payment (typically >= amount_usd)
-            amount_usd: Amount in USD
+            amount: Amount to pay
             to: Destination address
-            reason: Why this payment is being made
-            protocol, endpoint_url, endpoint_method, endpoint_json: Same as task.pay()
+            context: Agent context or current state (str or dict)
+            protocol: "x402" (default) or "transfer"
+            params: Executor-specific params (e.g. X402Params(url=...) for x402)
+            budget: Optional cap for this payment; default from policy (max_amount_usd_per_tx)
+            description: Optional task description (for policy/coherence); default ""
 
         Returns: PayResult on success
         Raises: Same as task.pay()
         """
         task_id = f"{DIRECT_PAY_TASK_PREFIX}-{uuid.uuid4().hex}"
-        self._start_task(task_id, description, budget)
+        effective_budget = budget if budget is not None else self._policy.max_amount_usd_per_tx
+        self._start_task(task_id, description or "", effective_budget)
         try:
             return self._pay(
                 task_id=task_id,
-                amount_usd=amount_usd,
+                amount=amount,
                 to=to,
-                reason=reason,
+                context=context,
                 protocol=protocol,
-                endpoint_url=endpoint_url,
-                endpoint_method=endpoint_method,
-                endpoint_json=endpoint_json,
+                params=params,
             )
         finally:
             self._end_task(task_id)
@@ -240,13 +239,11 @@ class Wallet:
     def _pay(
         self,
         task_id: str,
-        amount_usd: float,
+        amount: float,
         to: str,
-        reason: str,
+        context: ContextInput,
         protocol: Protocol,
-        endpoint_url: str | None,
-        endpoint_method: HttpMethod = "GET",
-        endpoint_json: dict[str, object] | None = None,
+        params: PaymentParams | None = None,
     ) -> PayResult:
         """
         Internal payment flow:
@@ -267,10 +264,11 @@ class Wallet:
                 f"Task '{task_id}' not found. Use wallet.task() context manager."
             )
 
+        endpoint_url, endpoint_method, endpoint_json = _params_to_endpoint(params, protocol)
         tx = Transaction(
-            amount_usd=amount_usd,
+            amount=amount,
             to=to,
-            reason=reason,
+            context=context,
             task_id=task_id,
             protocol=protocol,
             network=self._network,
@@ -311,14 +309,14 @@ class Wallet:
             result: ExecutionResult = executor.execute(tx, self._signer)
             tx_hash = result.tx_hash
             response_data = result.response_data
-            task.spend(amount_usd, to)
+            task.spend(amount, to)
 
             return PayResult(
                 success=True,
                 tx_hash=tx_hash,
-                amount_usd=amount_usd,
+                amount=amount,
                 to=to,
-                reason=reason,
+                context=tx.context_string,
                 protocol=protocol,
                 network=self._network,
                 risk_score=decision.risk_score,

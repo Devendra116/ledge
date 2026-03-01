@@ -43,7 +43,7 @@ def _words(text: str) -> set[str]:
 
 def check_task_coherence(tx: Transaction, ctx: TaskContext, policy: Policy) -> CheckResult:
     """
-    Word-overlap score between tx.reason and ctx.task_description.
+    Word-overlap score between tx.context_string and ctx.task_description.
     overlap = |task_words ∩ reason_words| / max(|task_words|, 1)
     risk    = max(0, 1 - overlap) * coherence_weight
 
@@ -54,7 +54,7 @@ def check_task_coherence(tx: Transaction, ctx: TaskContext, policy: Policy) -> C
         return CheckResult("task_coherence", Outcome.ALLOW, "No task description", 0.0)
 
     task_words = _words(ctx.task_description)
-    reason_words = _words(tx.reason)
+    reason_words = _words(tx.context_string)
 
     if not task_words:
         return CheckResult("task_coherence", Outcome.ALLOW, "Task has no meaningful words", 0.0)

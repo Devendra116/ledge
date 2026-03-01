@@ -27,6 +27,7 @@ from ledge import (
     Wallet,
     load_policy,
 )
+from ledge.models import X402Params
 
 load_dotenv()
 
@@ -108,13 +109,15 @@ def main() -> None:
             print(f"  #{i+1}  {ep['description'][:45]}  (${amount:.4f})  ", end="")
             try:
                 result = task.pay(
-                    amount_usd=amount,
+                    amount=amount,
                     to=ep["payto"],
-                    reason=f"Fetch data from {ep['description']}",
+                    context=f"Fetch data from {ep['description']}",
                     protocol="x402",
-                    endpoint_url=ep["url"],
-                    endpoint_method=ep.get("method", "GET"),
-                    endpoint_json=ep.get("json"),
+                    params=X402Params(
+                        url=ep["url"],
+                        method=ep.get("method", "GET"),
+                        body=ep.get("json"),
+                    ),
                 )
                 remaining = next(iter(wallet.balances().values()), 0)
                 print(f"✅ ALLOW   remaining ${remaining:.4f}  tx={result.tx_hash}")
@@ -130,7 +133,7 @@ def main() -> None:
         icon = {"allow": "✅", "block": "🚫", "escalate": "⚠️ "}.get(event.outcome, "?")
         print(
             f"  {icon} {event.outcome.upper():8s} | "
-            f"${event.amount_usd:.4f} | "
+            f"${event.amount:.4f} | "
             f"{event.decision_reason[:50]}"
         )
 

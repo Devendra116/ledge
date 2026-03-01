@@ -11,7 +11,7 @@ from ledge.errors import (
 from ledge.execution.base import PaymentExecutor
 from ledge.execution.transfer import TransferExecutor
 from ledge.execution.x402 import X402Executor
-from ledge.models import Network, Policy, Transaction, load_policy
+from ledge.models import Network, Policy, Transaction, X402Params, load_policy
 from ledge.signing.base import SigningProvider
 from ledge.signing.env_signer import EnvSigner
 from ledge.signing.mock_signer import MockSigner
@@ -25,6 +25,7 @@ __all__ = [
     "Policy",
     "load_policy",
     "Transaction",
+    "X402Params",
     "Network",
     "EnvSigner",
     "MockSigner",

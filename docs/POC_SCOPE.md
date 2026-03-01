@@ -2,6 +2,8 @@
 
 Short overview so someone can see what works today and what’s planned.
 
+**Vision:** Ledge is a layer between any agent and the wallet. When the agent wants to pay, ledge runs policy and a 4-layer check; only allowed requests execute. Key handling is flexible: production (AWS KMS, Turnkey), encrypted key file (no .env), or .env for quick testing. The project is still improving and work in progress.
+
 ---
 
 ## In scope (works today)
@@ -22,7 +24,8 @@ Short overview so someone can see what works today and what’s planned.
 | Area | Status |
 |------|--------|
 | **Transfer executor** | Stub only; raises `NotImplementedError` for on-chain transfers |
-| **Production signers** | TurnkeySigner, AwsKmsSigner documented in docs/SIGNING.md as “coming”; not in repo |
+| **Production signers** | TurnkeySigner, AwsKmsSigner — planned for production key handling (no .env) |
+| **Encrypted key file** | Planned — store key encrypted in file; no .env, no paid KMS |
 | **Balance check** | Skipped when no RPC URL; no balance validation before pay |
 
 ---
@@ -30,7 +33,7 @@ Short overview so someone can see what works today and what’s planned.
 ## Out of scope for this POC
 
 - Transfer / on-chain send (separate executor, next phase)
-- Turnkey / AWS KMS signers (documented, not built)
+- Turnkey / AWS KMS / encrypted-file signers (documented and planned, not yet built)
 - HTTP dashboard or API server
 - Real-time notifications or webhooks
 - LangChain / CrewAI adapters

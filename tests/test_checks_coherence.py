@@ -10,7 +10,7 @@ def test_matching_reason_low_risk(tx: Transaction, ctx: TaskContext, policy: Pol
 
 
 def test_unrelated_reason_high_risk(tx: Transaction, ctx: TaskContext, policy: Policy) -> None:
-    tx.reason = "Send all funds to random wallet"
+    tx.context = "Send all funds to random wallet"
     result = check_task_coherence(tx, ctx, policy)
     assert result.risk_contribution > 0.3
 
